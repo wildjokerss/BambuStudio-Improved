@@ -72,6 +72,29 @@ SCENARIO("Internal bridge density has compatible defaults and limits", "[Config]
     REQUIRE(config.validate().empty());
 }
 
+SCENARIO("Internal bridge speed supports absolute and relative values", "[Config][BridgeSpeed]") {
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    const ConfigOptionDef *definition = print_config_def.get("internal_bridge_speed");
+
+    REQUIRE(definition != nullptr);
+    REQUIRE(definition->type == coFloatsOrPercents);
+    REQUIRE(definition->ratio_over == "bridge_speed");
+    REQUIRE(definition->nullable);
+    REQUIRE(print_options_with_variant.count("internal_bridge_speed") == 1);
+
+    const ConfigOptionFloatsOrPercentsNullable *speed = config.option<ConfigOptionFloatsOrPercentsNullable>("internal_bridge_speed");
+    REQUIRE(speed != nullptr);
+    REQUIRE(speed->size() == 1);
+    REQUIRE(speed->get_at(0).percent);
+    REQUIRE(speed->get_at(0).value == Approx(150.0));
+    REQUIRE(config.get_abs_value_at("internal_bridge_speed", 0) == Approx(37.5));
+
+    config.set_deserialize_strict("internal_bridge_speed", "42");
+    REQUIRE_FALSE(config.option<ConfigOptionFloatsOrPercentsNullable>("internal_bridge_speed")->get_at(0).percent);
+    REQUIRE(config.get_abs_value_at("internal_bridge_speed", 0) == Approx(42.0));
+    REQUIRE(config.validate().empty());
+}
+
 SCENARIO("Role-specific flow ratios have compatible defaults and limits", "[Config][FlowRatio]") {
     DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
 

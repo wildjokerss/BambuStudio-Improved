@@ -115,8 +115,8 @@ std::map<std::string, std::vector<SimpleSettingData>>  SettingsFactory::PART_CAT
                     }},
     { L("Speed"), {{"outer_wall_speed", "",1},{"inner_wall_speed", "",2},{"sparse_infill_speed", "",3},{"top_surface_speed", "",4}, {"internal_solid_infill_speed", "",5},
                     {"enable_overhang_speed", "",6}, {"overhang_1_4_speed", "",7}, {"overhang_2_4_speed", "",8}, {"overhang_3_4_speed", "",9}, {"overhang_4_4_speed", "",10}, {"overhang_totally_speed", "",11},
-                    {"bridge_speed", "",12}, {"gap_infill_speed", "",13}, {"enable_height_slowdown", "", 14}, {"slowdown_start_height", "", 15}, {"slowdown_start_speed", "", 16}, {"slowdown_start_acc", "", 17},
-                    {"slowdown_end_height", "", 18}, {"slowdown_end_speed", "", 19}, {"slowdown_end_acc", "", 20}
+                    {"bridge_speed", "",12}, {"internal_bridge_speed", "",13}, {"gap_infill_speed", "",14}, {"enable_height_slowdown", "", 15}, {"slowdown_start_height", "", 16}, {"slowdown_start_speed", "", 17}, {"slowdown_start_acc", "", 18},
+                    {"slowdown_end_height", "", 19}, {"slowdown_end_speed", "", 20}, {"slowdown_end_acc", "", 21}
                     }}
 };
 

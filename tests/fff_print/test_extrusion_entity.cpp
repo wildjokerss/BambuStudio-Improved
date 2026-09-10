@@ -11,6 +11,14 @@
 
 using namespace Slic3r;
 
+SCENARIO("Internal bridge extrusion role retains bridge semantics", "[ExtrusionEntity][BridgeSpeed]") {
+    REQUIRE(is_infill(erInternalBridgeInfill));
+    REQUIRE(is_solid_infill(erInternalBridgeInfill));
+    REQUIRE(is_bridge(erInternalBridgeInfill));
+    REQUIRE(ExtrusionEntity::role_to_string(erInternalBridgeInfill) == "Internal bridge");
+    REQUIRE(ExtrusionEntity::string_to_role("Internal bridge") == erInternalBridgeInfill);
+}
+
 static inline Slic3r::Point random_point(float LO=-50, float HI=50) 
 {
     Vec2f pt = Vec2f(LO, LO) + (Vec2d(rand(), rand()) * (HI-LO) / RAND_MAX).cast<float>();

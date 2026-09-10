@@ -246,7 +246,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer, LockRegionParam &lock_p
 
 		        params.extrusion_role =
 		            is_bridge ?
-		                erBridgeInfill :
+		                (surface.is_internal_bridge() ? erInternalBridgeInfill : erBridgeInfill) :
 		                (surface.is_solid() ?
 		                    (surface.is_top() ? erTopSolidInfill : (surface.is_bottom()? erBottomSurface : surface.is_floating_vertical_shell()?erFloatingVerticalShell:erSolidInfill)) :
 		                    erInternalInfill);
@@ -284,6 +284,8 @@ std::vector<SurfaceFill> group_fills(const Layer &layer, LockRegionParam &lock_p
 					}
                 } else if (params.extrusion_role == erBridgeInfill) {
                     params.bridge_speed = region_config.bridge_speed.get_at(layer.get_process_config_idx(params.extruder));
+                } else if (params.extrusion_role == erInternalBridgeInfill) {
+                    params.bridge_speed = region_config.get_abs_value_at("internal_bridge_speed", layer.get_process_config_idx(params.extruder));
                 }
 				// Calculate flow spacing for infill pattern generation.
 		        if (surface.is_solid() || is_bridge) {

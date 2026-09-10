@@ -1163,7 +1163,7 @@ namespace SupportMaterialInternal {
             for (const ExtrusionEntity *ee2 : static_cast<const ExtrusionEntityCollection*>(ee)->entities) {
                 assert(! ee2->is_collection());
                 assert(! ee2->is_loop());
-                if (ee2->role() == erBridgeInfill)
+                if (ee2->role() == erBridgeInfill || ee2->role() == erInternalBridgeInfill)
                     return true;
             }
         }

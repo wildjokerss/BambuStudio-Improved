@@ -1864,14 +1864,25 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsNullable{ 100000. });
 
     def = this->add("bridge_speed", coFloats);
-    def->label = L("Bridge");
+    def->label = L("External");
     def->category = L("Speed");
-    def->tooltip = L("Speed of bridge and completely overhang wall");
+    def->tooltip = L("Speed of external bridges and completely overhanging walls");
     def->sidetext = L("mm/s");
     def->min = 0;
     def->mode = comAdvanced;
     def->nullable = true;
     def->set_default_value(new ConfigOptionFloatsNullable{25});
+
+    def = this->add("internal_bridge_speed", coFloatsOrPercents);
+    def->label = L("Internal");
+    def->category = L("Speed");
+    def->tooltip = L("Speed of internal bridges. If expressed as a percentage, it is calculated from the external bridge speed. The default is 150%.");
+    def->sidetext = L("mm/s or %");
+    def->ratio_over = "bridge_speed";
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->nullable = true;
+    def->set_default_value(new ConfigOptionFloatsOrPercentsNullable{FloatOrPercent(150, true)});
 
     def = this->add("brim_width", coFloat);
     def->label = L("Brim width");
@@ -7653,6 +7664,7 @@ std::set<std::string> print_options_with_variant = {
     "slowdown_end_speed", //coFloats
     "slowdown_end_acc", //coFloats
     "bridge_speed",
+    "internal_bridge_speed",
     "gap_infill_speed",
     "support_speed",
     "support_interface_speed",

@@ -370,6 +370,7 @@ std::unordered_map<int, std::unordered_map<int, double>> PrintObject::calc_estim
             else
                 return region_config.bridge_speed.values[extruder_id];
         }
+        case erInternalBridgeInfill: return region_config.get_abs_value_at("internal_bridge_speed", extruder_id);
         case erInternalInfill: return region_config.sparse_infill_speed.values[extruder_id];
         case erFloatingVerticalShell:
         case erSolidInfill: return region_config.internal_solid_infill_speed.values[extruder_id];
@@ -1628,6 +1629,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "overhang_4_4_speed"
             || opt_key == "overhang_totally_speed"
             || opt_key == "bridge_speed"
+            || opt_key == "internal_bridge_speed"
             || opt_key == "outer_wall_speed"
             || opt_key == "small_perimeter_speed"
             || opt_key == "small_perimeter_threshold"
