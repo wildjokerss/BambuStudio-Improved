@@ -131,11 +131,24 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
     wxCoord v_pos = 0;
     wxCoord h_pos = get_title_width() * m_em_unit;
 
-    auto correct_line_height = [](int& line_height, wxWindow* win)
+    auto correct_line_height = [this, &line](int& line_height, wxWindow* win)
     {
-        int win_height = win->GetSize().GetHeight();
-        if (line_height < win_height)
+        const int win_height = win->GetSize().GetHeight();
+        const int option_count = static_cast<int>(line.get_options().size());
+
+        if (opt_group->split_multi_line && option_count > 1) {
+            // Multi-option row height is initially derived from the label metrics. On macOS
+            // a TextInput may be taller than that calculated row, making adjacent borders touch.
+            // Size the row from the real control and retain a compact, DPI-scaled gap.
+            const int compact_gap = std::max(1, static_cast<int>(lround(0.2 * m_em_unit)));
+            const int feature_gap = m_v_gap - m_v_gap2;
+            const int row_height = (line_height - feature_gap) / option_count;
+            const int required_row_height = win_height + compact_gap;
+            if (row_height < required_row_height)
+                line_height = required_row_height * option_count + feature_gap;
+        } else if (line_height < win_height) {
             line_height = win_height;
+        }
     };
 
     auto correct_line_height_for_sizer = [this](int& line_height, wxSizer* sizer)
@@ -910,9 +923,8 @@ void OG_CustomCtrl::CtrlLine::render_separator(wxDC& dc, wxCoord v_pos)
     wxPoint begin(ctrl->m_h_gap, v_pos);
     wxPoint end(ctrl->GetSize().GetWidth() - ctrl->m_h_gap, v_pos);
 
-    wxPen pen, old_pen = pen = dc.GetPen();
-    pen.SetColour(*wxLIGHT_GREY);
-    dc.SetPen(pen);
+    wxPen old_pen = dc.GetPen();
+    dc.SetPen(*wxTRANSPARENT_PEN);
     dc.DrawLine(begin, end);
     dc.SetPen(old_pen);
 }

@@ -3389,6 +3389,18 @@ void TabPrint::build()
         optgroup->append_single_option_line("internal_solid_infill_speed", "", 0);
         optgroup->append_single_option_line("vertical_shell_speed", "", 0);
         optgroup->append_single_option_line("top_surface_speed", "", 0);
+        optgroup->append_single_option_line("gap_infill_speed", "", 0);
+        optgroup->append_single_option_line("support_speed", "", 0);
+        optgroup->append_single_option_line("support_interface_speed", "", 0);
+        optgroup->append_single_option_line("enable_height_slowdown", "", 0);
+        optgroup->append_single_option_line("slowdown_start_height", "", 0);
+        optgroup->append_single_option_line("slowdown_start_speed", "", 0);
+        optgroup->append_single_option_line("slowdown_start_acc", "", 0);
+        optgroup->append_single_option_line("slowdown_end_height", "", 0);
+        optgroup->append_single_option_line("slowdown_end_speed", "", 0);
+        optgroup->append_single_option_line("slowdown_end_acc", "", 0);
+
+        optgroup = page->new_optgroup(L("Overhang speed"), L"param_speed", 15);
         optgroup->append_single_option_line("enable_overhang_speed", "slow-down-for-overhang", 0);
         Line line = { L("Overhang speed"), L("This is the speed for various overhang degrees. Overhang degrees are expressed as a percentage of line width. 0 speed means no slowing down for the overhang degree range and wall speed is used") };
         line.label_path = "slow-down-for-overhang";
@@ -3398,21 +3410,11 @@ void TabPrint::build()
         line.append_option(optgroup->get_option("overhang_4_4_speed", 0));
         line.append_option(optgroup->get_option("overhang_totally_speed", 0));
         optgroup->append_line(line);
-        optgroup->append_single_option_line("enable_height_slowdown", "", 0);
-        optgroup->append_single_option_line("slowdown_start_height", "", 0);
-        optgroup->append_single_option_line("slowdown_start_speed", "", 0);
-        optgroup->append_single_option_line("slowdown_start_acc", "", 0);
-        optgroup->append_single_option_line("slowdown_end_height", "", 0);
-        optgroup->append_single_option_line("slowdown_end_speed", "", 0);
-        optgroup->append_single_option_line("slowdown_end_acc", "", 0);
         optgroup->append_separator();
         line = { L("Bridge"), L("Set speed for external and internal bridges") };
         line.append_option(optgroup->get_option("bridge_speed", 0));
         line.append_option(optgroup->get_option("internal_bridge_speed", 0));
         optgroup->append_line(line);
-        optgroup->append_single_option_line("gap_infill_speed", "", 0);
-        optgroup->append_single_option_line("support_speed", "", 0);
-        optgroup->append_single_option_line("support_interface_speed", "", 0);
 
         optgroup = page->new_optgroup(L("Travel speed"), L"param_travel_speed", 15);
         optgroup->append_single_option_line("travel_speed", "", 0);

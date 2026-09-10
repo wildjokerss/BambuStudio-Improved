@@ -160,11 +160,17 @@ void OptionsGroup::remove_option_if(std::function<bool(std::string const &)> con
         opts.erase(std::remove_if(opts.begin(), opts.end(), [&comp](Option &o) { return comp(o.opt.opt_key); }), opts.end());
         l.undo_to_sys = true;
     }
-    for (int i = m_lines.size() - 1; i >= 0; --i) {
-        if (m_lines[i].get_options().empty())
-            m_options_mode.erase(m_options_mode.begin() + i);
-    }
     m_lines.erase(std::remove_if(m_lines.begin(), m_lines.end(), [](auto &l) { return l.get_options().empty(); }), m_lines.end());
+
+    // m_options_mode only contains entries for lines with options, while m_lines may
+    // also contain separators. Rebuild it after filtering instead of indexing it with
+    // an m_lines position, which would erase past the end when a separator is present.
+    m_options_mode.clear();
+    for (const Line &line : m_lines) {
+        const auto &options = line.get_options();
+        if (!options.empty())
+            m_options_mode.push_back(options.front().opt.mode);
+    }
     // TODO: remove items from g->m_options;
 }
 
