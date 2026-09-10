@@ -1378,10 +1378,13 @@ void OG_CustomCtrl::CtrlLine::update_multi_variant_height()
         total_height -= ctrl->m_v_gap2;
     }
 
-    wxSize label_sz  = ctrl->GetTextExtent(og_line.label);
-    height = is_horizontal
-        ? std::max(label_sz.y, total_height) + ctrl->m_v_gap
-        : std::max(label_sz.y, total_height);
+    wxSize label_sz = ctrl->GetTextExtent(og_line.label);
+    if (is_horizontal) {
+        const int label_lines = label_sz.GetWidth() > int(ctrl->opt_group->label_width * ctrl->m_em_unit) ? 2 : 1;
+        height = std::max(total_height, label_sz.y * label_lines + ctrl->m_v_gap);
+    } else {
+        height = std::max(label_sz.y, total_height);
+    }
 }
 
 } // GUI
