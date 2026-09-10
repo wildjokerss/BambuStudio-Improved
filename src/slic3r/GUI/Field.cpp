@@ -2270,7 +2270,9 @@ void MultiVariantTextCtrl::refresh_text_ctrls_layout(wxWindow *parent)
         if (new_layout.size() != 1 && label_text) {
             auto text_input = dynamic_cast<::TextInput*>(text_ctrl->getWindow());
             if (text_input) {
-                const int compact_width = (def_width_wider() / 2) * m_em_unit + 20;
+                const int compact_width =
+                    text_input->GetTextExtent(label_text).GetWidth() +
+                    text_input->GetTextCtrl()->GetTextExtent("1.79").GetWidth() + 24;
                 text_input->SetSize(wxSize(compact_width, wxDefaultCoord));
                 text_input->SetPrefix(label_text);
             }

@@ -776,11 +776,17 @@ void OG_CustomCtrl::CtrlLine::correct_items_positions()
             wxPoint  base_pos   = ctrl->get_pos(og_line, field);
             wxSizer *main_sizer = multi_variant->getSizer();
             auto     children   = main_sizer->GetChildren();
-            int single_line_height = children.empty() ? 0 : (height - ctrl->m_v_gap + ctrl->m_v_gap2) / children.size();
+            auto    *box_sizer     = dynamic_cast<wxBoxSizer *>(main_sizer);
+            bool     is_horizontal = box_sizer && box_sizer->GetOrientation() == wxHORIZONTAL;
+
+            int single_line_height = is_horizontal ? height :
+                (children.empty() ? 0 : (height - ctrl->m_v_gap + ctrl->m_v_gap2) / children.size());
 
             wxPoint current_pos = base_pos;
-            current_pos.y += 2;
+            if (!is_horizontal)
+                current_pos.y += 2;
 
+            size_t child_idx = 0;
             for (auto child : children) {
                 if (child->IsSizer()) {
                     auto h_sizer = child->GetSizer();
@@ -797,8 +803,16 @@ void OG_CustomCtrl::CtrlLine::correct_items_positions()
                             item_x += sz.x + ctrl->m_h_gap;
                         }
                     }
-                    current_pos.y += single_line_height;
+
+                    if (is_horizontal) {
+                        current_pos.x = item_x;
+                        if (child_idx + 1 < children.size())
+                            current_pos.x += ctrl->m_bmp_blinking_sz.GetWidth() + ctrl->m_h_gap;
+                    } else {
+                        current_pos.y += single_line_height;
+                    }
                 }
+                ++child_idx;
             }
             continue;
         }
@@ -936,6 +950,51 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord h_pos, wxCoord v_pos)
 
         if (multi_variant_field->getSizer()) {
             auto children = multi_variant_field->getSizer()->GetChildren();
+            auto *box_sizer = dynamic_cast<wxBoxSizer *>(multi_variant_field->getSizer());
+            bool is_horizontal = box_sizer && box_sizer->GetOrientation() == wxHORIZONTAL;
+
+            if (is_horizontal) {
+                size_t variant_idx = 0;
+                for (auto child : children) {
+                    if (!child->IsSizer())
+                        continue;
+
+                    wxWindow *first_window = nullptr;
+                    wxWindow *last_window  = nullptr;
+                    int       max_height   = 0;
+                    for (auto item : child->GetSizer()->GetChildren()) {
+                        if (!item->IsWindow())
+                            continue;
+                        wxWindow *win = item->GetWindow();
+                        if (!first_window)
+                            first_window = win;
+                        last_window = win;
+                        max_height  = std::max(max_height, win->GetSize().GetHeight());
+                    }
+
+                    Field *variant_field = variant_idx < multi_variant_field->m_text_ctrls.size()
+                        ? multi_variant_field->m_text_ctrls[variant_idx].text_ctrl.get()
+                        : nullptr;
+                    if (variant_field && variant_field->undo_to_sys_bitmap() && first_window && last_window) {
+                        const wxBitmap &undo_bitmap = variant_field->undo_bitmap()->bmp();
+                        const int bitmap_width = get_bitmap_size(undo_bitmap).GetWidth();
+                        const int button_x = ctrl->opt_group->option_label_at_right
+                            ? first_window->GetPosition().x - bitmap_width - ctrl->m_h_gap
+                            : last_window->GetPosition().x + last_window->GetSize().GetWidth() + ctrl->m_h_gap;
+                        const int button_y = first_window->GetPosition().y +
+                            std::max(0, (max_height - get_bitmap_size(undo_bitmap).GetHeight()) / 2);
+
+                        draw_act_bmps(dc, wxPoint(button_x, button_y),
+                                      variant_field->undo_to_sys_bitmap()->bmp(),
+                                      undo_bitmap,
+                                      variant_field->blink(),
+                                      variant_idx,
+                                      true);
+                    }
+                    ++variant_idx;
+                }
+                return;
+            }
 
             int total_child_count = 0;
             for (auto child : children) {
@@ -1285,10 +1344,16 @@ void OG_CustomCtrl::CtrlLine::update_multi_variant_height()
 
     int  total_height = 0;
     auto children     = multi_variant_field->getSizer()->GetChildren();
+    auto *box_sizer   = dynamic_cast<wxBoxSizer *>(multi_variant_field->getSizer());
+    bool is_horizontal = box_sizer && box_sizer->GetOrientation() == wxHORIZONTAL;
 
     for (auto child : children) {
         if (child->IsWindow()) {
-            total_height += child->GetWindow()->GetSize().GetHeight() + ctrl->m_v_gap2;
+            int child_height = child->GetWindow()->GetSize().GetHeight();
+            if (is_horizontal)
+                total_height = std::max(total_height, child_height);
+            else
+                total_height += child_height + ctrl->m_v_gap2;
         } else if (child->IsSizer()) {
             auto sub_children = child->GetSizer()->GetChildren();
             int  max_height   = 0;
@@ -1301,17 +1366,22 @@ void OG_CustomCtrl::CtrlLine::update_multi_variant_height()
                 }
             }
             if (max_height > 0) {
-                total_height += max_height + ctrl->m_v_gap2;
+                if (is_horizontal)
+                    total_height = std::max(total_height, max_height);
+                else
+                    total_height += max_height + ctrl->m_v_gap2;
             }
         }
     }
 
-    if (total_height > 0 && multi_variant_field->m_text_ctrls.size() > 1) {
+    if (!is_horizontal && total_height > 0 && multi_variant_field->m_text_ctrls.size() > 1) {
         total_height -= ctrl->m_v_gap2;
     }
 
     wxSize label_sz  = ctrl->GetTextExtent(og_line.label);
-    height = std::max(label_sz.y, total_height);
+    height = is_horizontal
+        ? std::max(label_sz.y, total_height) + ctrl->m_v_gap
+        : std::max(label_sz.y, total_height);
 }
 
 } // GUI
