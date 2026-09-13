@@ -31,7 +31,7 @@ namespace GUI {
 #define PRINT_CANCELED_STR          _L("Task canceled.")
 #define SEND_PRINT_FAILED_STR       _L("Failed to send the print job. Please try again.")
 #define UPLOAD_FTP_FAILED_STR       _L("Failed to upload file to ftp. Please try again.")
-#define PRINT_SIGNED_STR            _L("Your software is not signed, and some printing functions have been restricted. Please use the officially signed software version.")
+#define PRINT_SIGNED_STR            _L("This build is not officially signed by Bambu Lab. Export the plate sliced file (.gcode.3mf), then import it into Bambu Connect to send it to your printer, or use the official Bambu Studio.")
 
 #define DESC_NETWORK_ERROR      _L("Check the current status of the bambu server by clicking on the link above.")
 #define DESC_FILE_TOO_LARGE     _L("The size of the print file is too large. Please adjust the file size and try again.")

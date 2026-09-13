@@ -393,6 +393,9 @@ void SendJob::process()
         else if (result == BAMBU_NETWORK_ERR_CANCELED) {
             msg_text = PRINT_CANCELED_STR;
         }
+        else if (result == BAMBU_NETWORK_SIGNED_ERROR) {
+            msg_text = _L("This build is not officially signed by Bambu Lab. Export the plate sliced file (.gcode.3mf), then import it into Bambu Connect to send it to your printer, or use the official Bambu Studio.");
+        }
         else {
             msg_text = SEND_PRINT_FAILED_STR;
         }

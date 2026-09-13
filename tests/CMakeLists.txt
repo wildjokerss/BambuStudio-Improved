@@ -34,5 +34,8 @@ add_subdirectory(fff_print)
 add_subdirectory(sla_print)
 add_subdirectory(fila_manager)
 add_subdirectory(filament_group)
+if (TARGET libslic3r_gui)
+    add_subdirectory(gui_jobs)
+endif()
 add_subdirectory(cpp17 EXCLUDE_FROM_ALL)    # does not have to be built all the time
 # add_subdirectory(example)
