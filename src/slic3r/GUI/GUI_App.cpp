@@ -6243,13 +6243,16 @@ void  GUI_App::push_notification(const MachineObject* obj, wxString msg, wxStrin
     }
 }
 
-void GUI_App::reload_settings()
+void GUI_App::reload_settings(const std::set<std::string>& cloud_names)
 {
     if (preset_bundle && m_agent) {
         std::map<std::string, std::map<std::string, std::string>> user_presets;
-        m_agent->get_user_presets(&user_presets);
+        if (m_agent->get_user_presets(&user_presets) != 0) {
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " could not read cloud presets; keeping local presets";
+            return;
+        }
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << __LINE__ << " cloud user preset number is: " << user_presets.size();
-        preset_bundle->load_user_presets(*app_config, user_presets, ForwardCompatibilitySubstitutionRule::Enable);
+        preset_bundle->load_user_presets(*app_config, user_presets, ForwardCompatibilitySubstitutionRule::Enable, &cloud_names);
         preset_bundle->save_user_presets(*app_config, get_delete_cache_presets());
         mainframe->update_side_preset_ui();
     }
@@ -6420,6 +6423,11 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
     ProgressFn progressFn;
     WasCancelledFn cancelFn;
     std::function<void(bool)> finishFn;
+    struct CloudNames {
+        std::mutex mutex;
+        std::set<std::string> names;
+    };
+    auto cloud_names = std::make_shared<CloudNames>();
 
     BOOST_LOG_TRIVIAL(info) << "start_sync_service...";
     // BBS
@@ -6436,17 +6444,31 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
         cancelFn = [this, dlg]() {
             return is_closing() || dlg->WasCanceled();
         };
-        finishFn = [this, userid = m_agent->get_user_id(), dlg, t = std::weak_ptr(m_user_sync_token)](bool ok) {
+        finishFn = [this, userid = m_agent->get_user_id(), dlg, t = std::weak_ptr(m_user_sync_token), cloud_names](bool ok) {
             CallAfter([=]{
                 dlg->Destroy();
-                if (ok && m_agent && t.lock() == m_user_sync_token && userid == m_agent->get_user_id()) reload_settings();
+                if (ok && m_agent && t.lock() == m_user_sync_token && userid == m_agent->get_user_id()) {
+                    std::set<std::string> names;
+                    {
+                        std::lock_guard<std::mutex> lock(cloud_names->mutex);
+                        names = cloud_names->names;
+                    }
+                    reload_settings(names);
+                }
             });
         };
     }
     else {
-        finishFn = [this, userid = m_agent->get_user_id(), t = std::weak_ptr(m_user_sync_token)](bool ok) {
+        finishFn = [this, userid = m_agent->get_user_id(), t = std::weak_ptr(m_user_sync_token), cloud_names](bool ok) {
             CallAfter([=] {
-                if (ok && m_agent && t.lock() == m_user_sync_token && userid == m_agent->get_user_id()) reload_settings();
+                if (ok && m_agent && t.lock() == m_user_sync_token && userid == m_agent->get_user_id()) {
+                    std::set<std::string> names;
+                    {
+                        std::lock_guard<std::mutex> lock(cloud_names->mutex);
+                        names = cloud_names->names;
+                    }
+                    reload_settings(names);
+                }
             });
         };
         cancelFn = [this]() {
@@ -6455,13 +6477,17 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
     }
 
     m_sync_update_thread = Slic3r::create_thread(
-        [this, progressFn, cancelFn, finishFn, t = std::weak_ptr(m_user_sync_token)] {
+        [this, progressFn, cancelFn, finishFn, cloud_names, t = std::weak_ptr(m_user_sync_token)] {
             // get setting list, update setting list
             std::string version = preset_bundle->get_vendor_profile_version(PresetBundle::BBL_BUNDLE).to_string();
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << __LINE__ << " start sync user preset, m_is_closing = " << m_is_closing;
-            int ret = m_agent->get_setting_list2(version, [this](auto info) {
+            int ret = m_agent->get_setting_list2(version, [this, cloud_names](auto info) {
                 auto type = info[BBL_JSON_KEY_TYPE];
                 auto name = info[BBL_JSON_KEY_NAME];
+                if (!name.empty()) {
+                    std::lock_guard<std::mutex> lock(cloud_names->mutex);
+                    cloud_names->names.insert(name);
+                }
                 auto setting_id = info[BBL_JSON_KEY_SETTING_ID];
                 auto update_time_str = info[BBL_JSON_KEY_UPDATE_TIME];
                 long long update_time = 0;

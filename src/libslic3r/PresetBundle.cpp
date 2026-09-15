@@ -936,7 +936,8 @@ PresetsConfigSubstitutions PresetBundle::load_user_presets(std::string user, For
 
 PresetsConfigSubstitutions PresetBundle::load_user_presets(AppConfig &                                                config,
                                                            std::map<std::string, std::map<std::string, std::string>> &my_presets,
-                                                           ForwardCompatibilitySubstitutionRule                       substitution_rule)
+                                                           ForwardCompatibilitySubstitutionRule                       substitution_rule,
+                                                           const std::set<std::string>*                               cloud_names)
 {
     // First load the vendor specific system presets.
     PresetsConfigSubstitutions substitutions;
@@ -949,7 +950,7 @@ PresetsConfigSubstitutions PresetBundle::load_user_presets(AppConfig &          
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(" printers's selected_idx %1%, selected_name %2%") %printers.get_selected_idx() %printers.get_selected_preset_name();
 
     // Sync removing
-    remove_users_preset(config, &my_presets);
+    remove_users_preset(config, &my_presets, cloud_names);
 
     std::map<std::string, std::map<std::string, std::string>>::iterator it;
     for (int pass = 0; pass < 2; ++pass)
@@ -1435,11 +1436,15 @@ int PresetBundle::validate_presets(const std::string &file_name, DynamicPrintCon
     return VALIDATE_PRESETS_SUCCESS;
 }
 
-void PresetBundle::remove_users_preset(AppConfig &config, std::map<std::string, std::map<std::string, std::string>> *my_presets)
+void PresetBundle::remove_users_preset(AppConfig &config, std::map<std::string, std::map<std::string, std::string>> *my_presets,
+                                       const std::set<std::string>* cloud_names)
 {
-    auto check_removed = [my_presets](Preset &preset) -> bool {
+    auto check_removed = [my_presets, cloud_names](Preset &preset) -> bool {
         if (my_presets == nullptr) return true;
         if (my_presets->find(preset.name) != my_presets->end()) return false;
+        // get_setting_list2 may omit values for a cloud preset that the
+        // need_sync callback judged current. Its name still exists remotely.
+        if (cloud_names != nullptr && cloud_names->count(preset.name) != 0) return false;
         if (!preset.sync_info.empty()) return false; // syncing, not remove
         if (preset.setting_id.empty()) return false; // no id, not remove
         // Saved preset is removed by another session

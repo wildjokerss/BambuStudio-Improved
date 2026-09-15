@@ -1219,7 +1219,7 @@ int NetworkAgent::start_sdcard_print(PrintParams params, OnUpdateStatusFn update
 
 int NetworkAgent::get_user_presets(std::map<std::string, std::map<std::string, std::string>>* user_presets)
 {
-    int ret = 0;
+    int ret = -1;
     if (network_agent && get_user_presets_ptr) {
         ret = get_user_presets_ptr(network_agent, user_presets);
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(" : network_agent=%1%, ret=%2%, setting_id count=%3%")%network_agent %ret %user_presets->size() ;

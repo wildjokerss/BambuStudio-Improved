@@ -438,11 +438,22 @@ std::string Preset::remove_suffix_modified(const std::string &name)
         name;
 }
 
+static void normalize_internal_bridge_speed(DynamicPrintConfig &config)
+{
+    // Profiles created before internal_bridge_speed was added inherit its
+    // one-element default even when they define several process variants.
+    if (const auto *variants = config.option<ConfigOptionStrings>("print_extruder_variant")) {
+        if (auto *speed = config.option<ConfigOptionFloatsOrPercentsNullable>("internal_bridge_speed"))
+            speed->resize(variants->size(), FullPrintConfig::defaults().option("internal_bridge_speed"));
+    }
+}
+
 // Update new extruder fields at the printer profile.
 void Preset::normalize(DynamicPrintConfig &config)
 {
     // BBS
     auto* filament_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("filament_diameter"));
+    normalize_internal_bridge_speed(config);
     //not use any more
     /*if (filament_diameter != nullptr)
         // Loaded the FFF Printer settings. Verify, that all extruder dependent values have enough values.
@@ -636,6 +647,28 @@ void Preset::remove_files()
         boost::nowide::remove(idx_path.string().c_str());
 }
 
+// An older parent preset may still have the one-element default for an option
+// added after its process variants were defined. Compare against that value in
+// every variant when writing the child's sparse, nil-filled preset.
+static void set_variant_diff_for_save(ConfigOptionVectorBase *dst, const ConfigOptionVectorBase *src,
+                                      const ConfigOption *parent_opt, const std::string &key, int stride)
+{
+    if (parent_opt == nullptr) {
+        dst->set(src);
+        return;
+    }
+
+    const auto *parent_vec = static_cast<const ConfigOptionVectorBase *>(parent_opt);
+    std::unique_ptr<ConfigOption> resized_parent;
+    if (parent_vec->size() != src->size()) {
+        resized_parent.reset(parent_opt->clone());
+        auto *resized_vec = static_cast<ConfigOptionVectorBase *>(resized_parent.get());
+        resized_vec->resize(src->size(), FullPrintConfig::defaults().option(key));
+        parent_vec = resized_vec;
+    }
+    dst->set_with_nil(src, parent_vec, stride);
+}
+
 //BBS: add logic for only difference save
 bool Preset::save(DynamicPrintConfig* parent_config)
 {
@@ -684,14 +717,13 @@ bool Preset::save(DynamicPrintConfig* parent_config)
             else {
                 ConfigOptionVectorBase* opt_vec_src = static_cast<ConfigOptionVectorBase*>(opt_src);
                 ConfigOptionVectorBase* opt_vec_dst = static_cast<ConfigOptionVectorBase*>(opt_dst);
-                ConfigOptionVectorBase* opt_vec_inherit = static_cast<ConfigOptionVectorBase*>(parent_config->option(option));
                 if (opt_vec_src->size() == 1)
                     opt_dst->set(opt_src);
                 else if (key_set1->find(option) != key_set1->end()) {
-                    opt_vec_dst->set_with_nil(opt_vec_src, opt_vec_inherit, 1);
+                    set_variant_diff_for_save(opt_vec_dst, opt_vec_src, parent_config->option(option), option, 1);
                 }
                 else if (key_set2->find(option) != key_set2->end()) {
-                    opt_vec_dst->set_with_nil(opt_vec_src, opt_vec_inherit, 2);
+                    set_variant_diff_for_save(opt_vec_dst, opt_vec_src, parent_config->option(option), option, 2);
                 }
                 else
                     opt_dst->set(opt_src);
@@ -1468,6 +1500,7 @@ void PresetCollection::load_presets(
                     const Preset& default_preset = this->default_preset_for(config);
                     if (inherit_preset) {
                         preset.config = inherit_preset->config;
+                        normalize_internal_bridge_speed(preset.config);
                         preset.filament_id = inherit_preset->filament_id;
                         extend_default_config_length(config, inherit_preset->config, false, {});
                         preset.config.update_diff_values_to_child_config(config, extruder_id_name, extruder_variant_name, *key_set1, *key_set2);
@@ -1593,14 +1626,13 @@ Preset* PresetCollection::get_preset_differed_for_save(Preset& preset)
             else {
                 ConfigOptionVectorBase* opt_vec_src = static_cast<ConfigOptionVectorBase*>(opt_src);
                 ConfigOptionVectorBase* opt_vec_dst = static_cast<ConfigOptionVectorBase*>(opt_dst);
-                ConfigOptionVectorBase* opt_vec_inherit = static_cast<ConfigOptionVectorBase*>(parent_preset->config.option(option));
                 if (opt_vec_src->size() == 1)
                     opt_dst->set(opt_src);
                 else if (key_set1->find(option) != key_set1->end()) {
-                    opt_vec_dst->set_with_nil(opt_vec_src, opt_vec_inherit, 1);
+                    set_variant_diff_for_save(opt_vec_dst, opt_vec_src, parent_preset->config.option(option), option, 1);
                 }
                 else if (key_set2->find(option) != key_set2->end()) {
-                    opt_vec_dst->set_with_nil(opt_vec_src, opt_vec_inherit, 2);
+                    set_variant_diff_for_save(opt_vec_dst, opt_vec_src, parent_preset->config.option(option), option, 2);
                 }
                 else
                     opt_dst->set(opt_src);
@@ -2056,6 +2088,7 @@ bool PresetCollection::load_user_preset(std::string name, std::map<std::string, 
         const Preset& default_preset = this->default_preset_for(cloud_config);
         if (inherit_preset) {
             new_config = inherit_preset->config;
+            normalize_internal_bridge_speed(new_config);
             if (cloud_filament_id == "null") {
                 cloud_filament_id = inherit_preset->filament_id;
             }
