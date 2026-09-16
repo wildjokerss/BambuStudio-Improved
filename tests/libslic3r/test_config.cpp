@@ -220,6 +220,97 @@ SCENARIO("Cloud loading a six-variant custom process preset keeps an absolute in
     REQUIRE(loaded->config.get_abs_value_at("internal_bridge_speed", 1) == Approx(75.0));
 }
 
+SCENARIO("Saving other flow ratios in a six-variant custom process preset survives reopening", "[Config][FlowRatio][PresetSave]") {
+    PresetBundle bundle;
+    DynamicPrintConfig parent = bundle.prints.default_preset().config;
+    parent.option<ConfigOptionInts>("print_extruder_id")->values = {1, 1, 1, 2, 2, 2};
+    parent.option<ConfigOptionStrings>("print_extruder_variant")->values = {
+        "Direct Drive Standard", "Direct Drive High Flow", "Direct Drive E3D High Flow",
+        "Bowden Standard", "Bowden High Flow", "Bowden E3D High Flow"
+    };
+    parent.option<ConfigOptionString>("inherits", true)->value = "fdm_process_dual_0.20_nozzle_0.4";
+    const std::string parent_name = "0.20mm Standard @BBL X2D";
+
+    const boost::filesystem::path dir = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path("flow-ratio-x2d-%%%%-%%%%");
+    const boost::filesystem::path user_file = dir / "0.20mm @ X2D.json";
+    Preset& parent_preset = bundle.prints.load_preset((dir / "parent.json").string(), parent_name,
+                                                      DynamicPrintConfig(parent), false);
+    parent_preset.is_system = true;
+
+    DynamicPrintConfig child = parent;
+    child.option<ConfigOptionString>("inherits", true)->value = parent_name;
+    for (const char *key : {"top_solid_infill_flow_ratio", "first_layer_flow_ratio", "outer_wall_flow_ratio", "inner_wall_flow_ratio",
+                            "overhang_flow_ratio", "sparse_infill_flow_ratio", "internal_solid_infill_flow_ratio",
+                            "gap_fill_flow_ratio", "support_flow_ratio", "support_interface_flow_ratio"})
+        child.option<ConfigOptionFloatsNullable>(key)->resize(6, FullPrintConfig::defaults().option(key));
+
+    Preset& custom = bundle.prints.load_preset(user_file.string(), "0.20mm @ X2D", std::move(child), false);
+    custom.is_visible = true;
+    bundle.prints.select_preset_by_name("0.20mm @ X2D", true);
+    auto &edited = bundle.prints.get_edited_preset().config;
+    edited.option<ConfigOptionBool>("set_other_flow_ratios")->value = true;
+    edited.option<ConfigOptionFloatsNullable>("outer_wall_flow_ratio")->values[0] = 0.85;
+    edited.option<ConfigOptionFloatsNullable>("support_interface_flow_ratio")->values[5] = 0.9;
+    bundle.prints.save_current_preset("0.20mm @ X2D", false, false);
+
+    std::ifstream saved(user_file.string());
+    REQUIRE(saved.good());
+    const auto json = nlohmann::json::parse(saved);
+    REQUIRE(json.contains("set_other_flow_ratios"));
+    REQUIRE(json.at("outer_wall_flow_ratio") == nlohmann::json::array({"0.85", "nil", "nil", "nil", "nil", "nil"}));
+    REQUIRE(json.at("support_interface_flow_ratio") == nlohmann::json::array({"nil", "nil", "nil", "nil", "nil", "0.9"}));
+
+    PresetBundle reopened;
+    Preset& reopened_parent = reopened.prints.load_preset((dir / "parent.json").string(), parent_name,
+                                                           DynamicPrintConfig(parent), false);
+    reopened_parent.is_system = true;
+    PresetsConfigSubstitutions substitutions;
+    reopened.prints.load_presets(dir.string(), "", substitutions, ForwardCompatibilitySubstitutionRule::Disable);
+    const Preset* loaded = reopened.prints.find_preset("0.20mm @ X2D", false, true);
+    REQUIRE(loaded != nullptr);
+    REQUIRE(loaded->config.option<ConfigOptionBool>("set_other_flow_ratios")->value);
+    REQUIRE(loaded->config.option<ConfigOptionFloatsNullable>("outer_wall_flow_ratio")->get_at(0) == Approx(0.85));
+    REQUIRE(loaded->config.option<ConfigOptionFloatsNullable>("support_interface_flow_ratio")->get_at(5) == Approx(0.9));
+    for (const char *key : {"top_solid_infill_flow_ratio", "first_layer_flow_ratio", "outer_wall_flow_ratio", "inner_wall_flow_ratio",
+                            "overhang_flow_ratio", "sparse_infill_flow_ratio", "internal_solid_infill_flow_ratio",
+                            "gap_fill_flow_ratio", "support_flow_ratio", "support_interface_flow_ratio"})
+        REQUIRE(loaded->config.option<ConfigOptionFloatsNullable>(key)->size() == 6);
+    boost::filesystem::remove_all(dir);
+}
+
+SCENARIO("Cloud loading other flow ratios in a six-variant custom process preset keeps the switch and values", "[Config][FlowRatio][CloudSync]") {
+    PresetBundle bundle;
+    DynamicPrintConfig parent = bundle.prints.default_preset().config;
+    parent.option<ConfigOptionInts>("print_extruder_id")->values = {1, 1, 1, 2, 2, 2};
+    parent.option<ConfigOptionStrings>("print_extruder_variant")->values = {
+        "Direct Drive Standard", "Direct Drive High Flow", "Direct Drive E3D High Flow",
+        "Bowden Standard", "Bowden High Flow", "Bowden E3D High Flow"
+    };
+    const std::string parent_name = "0.20mm Standard @BBL X2D";
+    Preset& parent_preset = bundle.prints.load_preset("parent.json", parent_name, std::move(parent), false);
+    parent_preset.is_system = true;
+
+    std::map<std::string, std::string> cloud_values = {
+        {BBL_JSON_KEY_VERSION, "0.0.0"},
+        {BBL_JSON_KEY_SETTING_ID, "test-process-id"},
+        {BBL_JSON_KEY_UPDATE_TIME, "1"},
+        {BBL_JSON_KEY_USER_ID, "test-user"},
+        {BBL_JSON_KEY_BASE_ID, "GP151"},
+        {BBL_JSON_KEY_INHERITS, parent_name},
+        {"set_other_flow_ratios", "1"},
+        {"outer_wall_flow_ratio", "0.85,nil,nil,nil,nil,nil"},
+        {"support_interface_flow_ratio", "nil,nil,nil,nil,nil,0.9"}
+    };
+    PresetsConfigSubstitutions substitutions;
+    REQUIRE(bundle.prints.load_user_preset("0.20mm @ X2D", cloud_values, substitutions,
+                                           ForwardCompatibilitySubstitutionRule::Disable));
+    const Preset* loaded = bundle.prints.find_preset("0.20mm @ X2D", false, true);
+    REQUIRE(loaded != nullptr);
+    REQUIRE(loaded->config.option<ConfigOptionBool>("set_other_flow_ratios")->value);
+    REQUIRE(loaded->config.option<ConfigOptionFloatsNullable>("outer_wall_flow_ratio")->get_at(0) == Approx(0.85));
+    REQUIRE(loaded->config.option<ConfigOptionFloatsNullable>("support_interface_flow_ratio")->get_at(5) == Approx(0.9));
+}
+
 SCENARIO("Incremental cloud preset reload keeps locally current user presets", "[Preset][CloudSync]") {
     PresetBundle bundle;
     AppConfig app_config;

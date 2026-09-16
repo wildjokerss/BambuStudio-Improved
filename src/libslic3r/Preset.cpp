@@ -438,13 +438,22 @@ std::string Preset::remove_suffix_modified(const std::string &name)
         name;
 }
 
-static void normalize_internal_bridge_speed(DynamicPrintConfig &config)
+static void normalize_process_variant_defaults(DynamicPrintConfig &config)
 {
-    // Profiles created before internal_bridge_speed was added inherit its
-    // one-element default even when they define several process variants.
-    if (const auto *variants = config.option<ConfigOptionStrings>("print_extruder_variant")) {
-        if (auto *speed = config.option<ConfigOptionFloatsOrPercentsNullable>("internal_bridge_speed"))
-            speed->resize(variants->size(), FullPrintConfig::defaults().option("internal_bridge_speed"));
+    // Older process profiles inherit one-element defaults for these newer
+    // options even when they define several extruder variants. The parent must
+    // match the child variant count before a nil-filled user diff is applied.
+    const auto *variants = config.option<ConfigOptionStrings>("print_extruder_variant");
+    if (variants == nullptr || variants->size() == 0)
+        return;
+
+    const auto &defaults = FullPrintConfig::defaults();
+    for (const char *key : {"internal_bridge_speed", "top_solid_infill_flow_ratio",
+                            "first_layer_flow_ratio", "outer_wall_flow_ratio", "inner_wall_flow_ratio",
+                            "overhang_flow_ratio", "sparse_infill_flow_ratio", "internal_solid_infill_flow_ratio",
+                            "gap_fill_flow_ratio", "support_flow_ratio", "support_interface_flow_ratio"}) {
+        if (auto *values = config.option(key))
+            static_cast<ConfigOptionVectorBase *>(values)->resize(variants->size(), defaults.option(key));
     }
 }
 
@@ -453,7 +462,7 @@ void Preset::normalize(DynamicPrintConfig &config)
 {
     // BBS
     auto* filament_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("filament_diameter"));
-    normalize_internal_bridge_speed(config);
+    normalize_process_variant_defaults(config);
     //not use any more
     /*if (filament_diameter != nullptr)
         // Loaded the FFF Printer settings. Verify, that all extruder dependent values have enough values.
@@ -1500,7 +1509,7 @@ void PresetCollection::load_presets(
                     const Preset& default_preset = this->default_preset_for(config);
                     if (inherit_preset) {
                         preset.config = inherit_preset->config;
-                        normalize_internal_bridge_speed(preset.config);
+                        normalize_process_variant_defaults(preset.config);
                         preset.filament_id = inherit_preset->filament_id;
                         extend_default_config_length(config, inherit_preset->config, false, {});
                         preset.config.update_diff_values_to_child_config(config, extruder_id_name, extruder_variant_name, *key_set1, *key_set2);
@@ -2088,7 +2097,7 @@ bool PresetCollection::load_user_preset(std::string name, std::map<std::string, 
         const Preset& default_preset = this->default_preset_for(cloud_config);
         if (inherit_preset) {
             new_config = inherit_preset->config;
-            normalize_internal_bridge_speed(new_config);
+            normalize_process_variant_defaults(new_config);
             if (cloud_filament_id == "null") {
                 cloud_filament_id = inherit_preset->filament_id;
             }
