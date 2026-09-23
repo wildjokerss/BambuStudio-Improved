@@ -2555,12 +2555,14 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("enable_pressure_advance", coBools);
     def->label = L("Enable pressure advance");
-    def->tooltip = L("Enable pressure advance, auto calibration result will be overwritten once enabled. Useless for Bambu Printer");
+    def->tooltip = L("Use the pressure advance value saved for the selected extruder and nozzle type in this filament profile. Applies after printer startup and each filament change, overriding automatic flow dynamics calibration. Leave disabled to use the printer's calibrated value for this extruder and nozzle type.");
+    def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBools{ false });
 
     def = this->add("pressure_advance", coFloats);
     def->label = L("Pressure advance");
-    def->tooltip = L("Pressure advance(Klipper) AKA Linear advance factor(Marlin). Useless for Bambu Printer");
+    def->tooltip = L("Pressure advance value for this filament and the selected extruder and nozzle type, also called the K factor on Bambu printers or linear advance on Marlin. Select Direct Drive or Bowden above to save a different value for each. Used when Enable pressure advance is checked.");
+    def->min = 0;
     def->max = 2;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats{ 0.02 });
@@ -5187,7 +5189,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("extruder_type", coEnums);
     def->label = L("Type");
-    def->tooltip = ("This setting is only used for initial value of manual calibration of pressure advance. Bowden extruder usually has larger pa value. This setting doesn't influence normal slicing");
+    def->tooltip = L("Extruder type used for manual pressure advance calibration and filament-profile pressure advance commands on Bambu printers. Bowden extruders usually require a larger pressure advance value.");
     def->enum_keys_map = &ConfigOptionEnum<ExtruderType>::get_enum_values();
     def->enum_values.push_back("Direct Drive");
     def->enum_values.push_back("Bowden");
@@ -7821,6 +7823,8 @@ std::set<std::string> print_options_with_variant = {
 };
 
 std::set<std::string> filament_options_with_variant = {
+    "enable_pressure_advance",
+    "pressure_advance",
     "filament_flow_ratio",
     "filament_max_volumetric_speed",
     "filament_ramming_volumetric_speed",

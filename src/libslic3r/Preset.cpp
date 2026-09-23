@@ -457,12 +457,41 @@ static void normalize_process_variant_defaults(DynamicPrintConfig &config)
     }
 }
 
+static void normalize_filament_pressure_advance(DynamicPrintConfig &config)
+{
+    const auto *variants = config.option<ConfigOptionStrings>("filament_extruder_variant");
+    if (!variants || variants->values.empty())
+        return;
+
+    const auto *filaments = config.option<ConfigOptionFloats>("filament_diameter");
+    const auto *filament_ids = config.option<ConfigOptionInts>("filament_self_index");
+    for (const char *key : {"enable_pressure_advance", "pressure_advance"}) {
+        auto *values = dynamic_cast<ConfigOptionVectorBase *>(config.option(key));
+        if (!values || values->size() >= variants->size())
+            continue;
+
+        // Older presets have one PA value; older projects have one per filament.
+        // Expand those values to the existing variants without mixing filaments.
+        const bool per_filament = filaments && filaments->size() > 1 && values->size() == filaments->size() &&
+                                  filament_ids && filament_ids->size() == variants->size() &&
+                                  std::all_of(filament_ids->values.begin(), filament_ids->values.end(),
+                                      [filaments](int id) { return id > 0 && size_t(id) <= filaments->size(); });
+        std::unique_ptr<ConfigOption> previous(values->clone());
+        values->resize(variants->size(), print_config_def.get(key)->default_value.get());
+        if (per_filament) {
+            for (size_t i = 0; i < variants->size(); ++i)
+                values->set_at(previous.get(), i, filament_ids->values[i] - 1);
+        }
+    }
+}
+
 // Update new extruder fields at the printer profile.
 void Preset::normalize(DynamicPrintConfig &config)
 {
     // BBS
     auto* filament_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("filament_diameter"));
     normalize_process_variant_defaults(config);
+    normalize_filament_pressure_advance(config);
     //not use any more
     /*if (filament_diameter != nullptr)
         // Loaded the FFF Printer settings. Verify, that all extruder dependent values have enough values.
@@ -1778,6 +1807,8 @@ void PresetCollection::load_project_embedded_presets(std::vector<Preset*>& proje
                 BOOST_LOG_TRIVIAL(error) << boost::format("can not find parent for config %1%!")%preset->file;
                 continue;
             }
+            normalize_filament_pressure_advance(preset->config);
+            normalize_filament_pressure_advance(config);
             preset->config.update_diff_values_to_child_config(config, extruder_id_name, extruder_variant_name, *key_set1, *key_set2);
             //preset->config.apply(std::move(config));
             Preset::normalize(preset->config);

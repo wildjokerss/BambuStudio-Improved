@@ -4742,8 +4742,8 @@ void TabFilament::build()
         optgroup->append_single_option_line("filament_adhesiveness_category", "parameter/prime-tower#adhesiveness");
         optgroup->append_single_option_line("filament_metal_stickiness");
         optgroup->append_single_option_line("filament_flow_ratio", "", 0);
-        optgroup->append_single_option_line("enable_pressure_advance");
-        optgroup->append_single_option_line("pressure_advance");
+        optgroup->append_single_option_line("enable_pressure_advance", "", 0);
+        optgroup->append_single_option_line("pressure_advance", "", 0);
         optgroup->append_single_option_line("filament_density");
         optgroup->append_single_option_line("filament_shrink");
         optgroup->append_single_option_line("filament_velocity_adaptation_factor");
@@ -5126,14 +5126,10 @@ void TabFilament::toggle_options()
         toggle_option("filament_type", false);
         toggle_option("filament_vendor", false);
         toggle_option("impact_strength_z", false);
-        //BBS: hide these useless option for bambu printer
-        toggle_line("enable_pressure_advance", !is_BBL_printer);
-        if (is_BBL_printer)
-            toggle_line("pressure_advance", false);
-        else {
-            toggle_line("pressure_advance", true);
-            toggle_option("pressure_advance", m_config->opt_bool("enable_pressure_advance", 0));
-        }
+        const int pa_variant = m_variant_combo ? std::max(0, m_variant_combo->GetSelection()) : 0;
+        toggle_line("enable_pressure_advance", true, 256 + pa_variant);
+        toggle_line("pressure_advance", true, 256 + pa_variant);
+        toggle_option("pressure_advance", m_config->opt_bool("enable_pressure_advance", pa_variant), 256 + pa_variant);
 
         bool support_chamber_temp_control = this->m_preset_bundle->printers.get_edited_preset().config.opt_bool("support_chamber_temp_control");
         toggle_line("chamber_temperatures", support_chamber_temp_control);

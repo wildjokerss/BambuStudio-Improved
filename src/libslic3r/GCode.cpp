@@ -1266,9 +1266,8 @@ static std::vector<Vec2d> get_path_of_change_filament(const Print& print)
         }
         check_add_eol(toolchange_gcode_str);
 
-        //OrcaSlicer: set new PA for new filament. BBS: never use for Bambu Printer
-        if (!gcodegen.is_BBL_Printer() && gcodegen.config().enable_pressure_advance.get_at(new_filament_id))
-            gcode += gcodegen.writer().set_pressure_advance(gcodegen.config().pressure_advance.get_at(new_filament_id));
+        // Apply the filament profile after the toolchange/calibration G-code.
+        gcode += gcodegen.writer().set_filament_pressure_advance(new_filament_id);
 
         gcodegen.set_extrude_acceleration(gcodegen.on_first_layer());
 
@@ -3045,6 +3044,10 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         int initial_nozzle_id = NOZZLE_ID_FOR_GCODE(group_result, group_result->get_first_nozzle_for_filament(initial_extruder_id)->group_id);
         file.write_format(";VT%d H%d\n", initial_extruder_id, initial_nozzle_id);
     }
+
+    // Startup can calibrate/reset PA, and init_extruder() makes the later
+    // set_extruder() a no-op for this filament. Apply its profile here too.
+    file.write(m_writer.set_filament_pressure_advance(initial_non_support_extruder_id));
 
     // Process filament-specific gcode.
    /* if (has_wipe_tower) {
@@ -8147,11 +8150,8 @@ std::string GCode::set_extruder(unsigned int new_filament_id, double print_z, bo
             gcode += this->placeholder_parser_process("filament_start_gcode", filament_start_gcode, new_filament_id, &config);
             check_add_eol(gcode);
         }
-        //BBS: never use for Bambu Printer
-        if (!this->is_BBL_Printer() && m_config.enable_pressure_advance.get_at(new_filament_id))
-            gcode += m_writer.set_pressure_advance(m_config.pressure_advance.get_at(new_filament_id));
-
         gcode += m_writer.toolchange(new_filament_id,new_nozzle_id);
+        gcode += m_writer.set_filament_pressure_advance(new_filament_id);
         return gcode;
     }
 
@@ -8470,9 +8470,7 @@ std::string GCode::set_extruder(unsigned int new_filament_id, double print_z, bo
     // Set the new extruder to the operating temperature.
     if (m_ooze_prevention.enable)
         gcode += m_ooze_prevention.post_toolchange(*this);
-    //BBS: never use for Bambu Printer
-    if (!this->is_BBL_Printer() && m_config.enable_pressure_advance.get_at(new_filament_id))
-        gcode += m_writer.set_pressure_advance(m_config.pressure_advance.get_at(new_filament_id));
+    gcode += m_writer.set_filament_pressure_advance(new_filament_id);
 
     return gcode;
 }

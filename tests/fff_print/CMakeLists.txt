@@ -30,6 +30,17 @@ endif()
 # catch_discover_tests(${_TEST_NAME}_tests TEST_PREFIX "${_TEST_NAME}: ")
 add_test(${_TEST_NAME}_tests ${_TEST_NAME}_tests ${CATCH_EXTRA_ARGS})
 
+add_executable(pressure_advance_tests
+    fff_print_tests.cpp
+    test_pressure_advance.cpp
+    ${PROJECT_SOURCE_DIR}/src/slic3r/Utils/Http.cpp
+    ${PROJECT_SOURCE_DIR}/src/slic3r/Utils/BBLUtil.cpp
+)
+target_link_libraries(pressure_advance_tests test_common libslic3r
+    libcurl OpenSSL::SSL OpenSSL::Crypto)
+set_property(TARGET pressure_advance_tests PROPERTY FOLDER "tests")
+add_test(NAME pressure_advance_tests COMMAND pressure_advance_tests)
+
 add_executable(support_material_on_wipe_tower_tests
 	fff_print_tests.cpp
 	test_data.cpp
@@ -61,4 +72,3 @@ if (MSVC)
 endif()
 set_property(TARGET periodic_modifier_tests PROPERTY FOLDER "tests")
 add_test(periodic_modifier_tests periodic_modifier_tests ${CATCH_EXTRA_ARGS})
-

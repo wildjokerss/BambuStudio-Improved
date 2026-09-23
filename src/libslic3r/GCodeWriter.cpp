@@ -1,8 +1,10 @@
 #include "GCodeWriter.hpp"
 #include "CustomGCode.hpp"
 #include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <locale>
 #include <map>
 #include <assert.h>
 
@@ -317,8 +319,9 @@ std::string GCodeWriter::set_acceleration_impl(unsigned int acceleration)
 std::string GCodeWriter::set_pressure_advance(double pa, bool is_bbl_bowden) const
 {
     std::ostringstream gcode;
-    if (pa < 0) return gcode.str();
-    if (false) { // todo: bbl printer
+    if (!std::isfinite(pa) || pa < 0) return gcode.str();
+    gcode.imbue(std::locale::classic());
+    if (m_is_bbl_printer && !is_bbl_bowden) {
         // OrcaSlicer: set L1000 to use linear model
         gcode << "M400\n M900 K" << std::setprecision(4) << pa << " L1000 M10 ; Override pressure advance value\n";
     } else {
@@ -332,6 +335,20 @@ std::string GCodeWriter::set_pressure_advance(double pa, bool is_bbl_bowden) con
             gcode << "M400\n M900 K" << std::setprecision(4) << pa << "; Override pressure advance value\n";
     }
     return gcode.str();
+}
+
+std::string GCodeWriter::set_filament_pressure_advance(unsigned int filament_id) const
+{
+    const size_t filament_config_index = get_filament_config_idx(config, filament_id);
+    if (!config.enable_pressure_advance.get_at(filament_config_index))
+        return {};
+
+    // Filament IDs and physical extruder IDs differ for AMS and dual-head
+    // printers. X2D's Bowden head uses the same M901 model as PA calibration.
+    const size_t extruder_id = get_extruder_index(config, filament_id);
+    const bool is_bbl_bowden = m_is_bbl_printer && extruder_id < config.extruder_type.size() &&
+                              config.extruder_type.get_at(extruder_id) == etBowden;
+    return set_pressure_advance(config.pressure_advance.get_at(filament_config_index), is_bbl_bowden);
 }
 
 std::string GCodeWriter::set_jerk_xy(double jerk)

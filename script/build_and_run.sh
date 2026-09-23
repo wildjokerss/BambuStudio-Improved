@@ -8,7 +8,8 @@ case "$mode" in
 esac
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-build_dir="$project_dir/build/$(uname -m)"
+build_arch="$(uname -m)"
+build_dir="$project_dir/build/$build_arch"
 app_bundle="$build_dir/printer-fix/BambuStudio.app"
 
 if [[ ! -f "$build_dir/CMakeCache.txt" ]]; then
@@ -21,6 +22,18 @@ if [[ "$mode" != --build-only ]] && pgrep -x BambuStudio >/dev/null; then
     echo "Save your project and quit Bambu Studio before running this script." >&2
     echo "Use --build-only to prepare the app while keeping your session open." >&2
     exit 1
+fi
+
+# Apple Silicon requires macOS 11 or newer. Older BuildMac.sh configurations
+# use 10.15, which modern Xcode's libc++ rejects when warnings are errors.
+if [[ "$build_arch" == arm64 ]]; then
+    deployment_target="$(sed -n 's/^CMAKE_OSX_DEPLOYMENT_TARGET:[^=]*=//p' "$build_dir/CMakeCache.txt")"
+    case "$deployment_target" in
+        ""|10.*)
+            echo "Updating Apple Silicon deployment target to macOS 11.0."
+            cmake -S "$project_dir" -B "$build_dir" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+            ;;
+    esac
 fi
 
 cmake --build "$build_dir" --target BambuStudio --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-4}"
