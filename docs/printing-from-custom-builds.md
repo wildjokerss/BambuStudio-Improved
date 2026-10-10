@@ -51,3 +51,24 @@ ctest --test-dir build/arm64 -R '^gui_job_error_tests$' --output-on-failure
 The test checks main-thread delivery, Unicode error details, ordering relative to
 progress updates, and cleanup when a job is destroyed before dispatch. It does
 not connect to a printer or start a print.
+
+## macOS hang after a successful print transfer
+
+On macOS 27, Studio 2.8.4.57 can stop responding after sending a plate even
+though the printer starts printing successfully. A September 29, 2026 process
+sample captured the main thread spinning inside
+`wxWebViewWebKit::AddScriptMessageHandler` → `RunScriptSync` → `wxYield`, while
+the print dialog's modal event loop was active. This matches upstream
+[issue #12357](https://github.com/bambulab/BambuStudio/issues/12357).
+
+`WebView::CreateWebView` now requests asynchronous script-handler injection on
+macOS. The bundled wxWidgets implementation registers the native message
+handler and the script for future page loads immediately, then injects the
+bridge into the current document without waiting for JavaScript completion.
+The existing view-lifetime checks remain in place.
+
+For a stuck session, preserve the directory named by `last_backup_path` in
+`BambuStudio.conf`, its original project file, and a process sample before
+terminating the application. Build with the command above and restore the
+project after relaunching. Do not resend the print solely to test recovery
+while the original job is still printing.

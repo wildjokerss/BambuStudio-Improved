@@ -1051,7 +1051,16 @@ wxWebView *WebView::CreateWebView(wxWindow *parent, wxString const &url, wxStrin
     if (has_backend_attempt) {
         auto addScriptMessageHandler = [] (wxWebView *webView) {
             Slic3r::GUI::wxGetApp().set_adding_script_handler(true);
-            if (!webView->AddScriptMessageHandler("wx"))
+#ifdef __WXMAC__
+            // A hidden WebKit view can suspend JavaScript while a modal print
+            // dialog is open. Waiting for it in RunScriptSync spins the UI
+            // thread indefinitely (BambuStudio #12357). Register the bridge
+            // with asynchronous injection into the current document instead.
+            const bool handler_added = webView->AddScriptMessageHandler("wx", false);
+#else
+            const bool handler_added = webView->AddScriptMessageHandler("wx");
+#endif
+            if (!handler_added)
                 log_webview(Slic3r::GUI::WebViewTraceLogger::Stage::L0_BACKEND, webView->GetName(),
                             "script_message_handler_failed", {},
                             Slic3r::GUI::WebViewTraceLogger::Severity::Warning);
